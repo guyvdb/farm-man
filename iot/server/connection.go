@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"time"
-	//"math/rand"
+	"math/rand"
 )
 
 const (
@@ -58,11 +58,102 @@ func (c *Connection) CreateTestFrameWithControlChars() *Frame {
 	return f
 }
 
+
+func (c *Connection) CreateRollingFrame() *Frame {
+	f := NewFrame([]byte{0xA,0xB,0xC,0xD})
+	f.Id = c.nextId( )
+	f.TCount = 1
+	f.Transmitted = int32(time.Now().Unix())
+	f.RefId = 0
+	f.Cmd = 33
+	return f
+}
+
+func (c *Connection) WriteFrame(frame *Frame) {
+
+	var length int
+	var werr error
+
+	fmt.Printf("=======================> WRITE\n")
+
+	
+	b := frame.NetworkBytes()
+	
+	length, werr = c.conn.Write(b)
+	if werr != nil {
+		fmt.Printf("Write Error: %v\n", werr)
+	} else {
+		fmt.Printf("Wrote %d bytes.\n", length)
+		c.timeoutCount = 0
+	}
+}
+
+// we are going to write the bytes in two writes with a delay between them
+// this is only for testing fragment combination on the client 
+func (c *Connection) WriteFrameFragmented(frame *Frame) {
+	var length int
+	var werr error
+
+
+	fmt.Printf("=======================> FRAGMENTED WRITE\n")
+
+	b := frame.NetworkBytes()
+
+
+	// we want a range in 4..n-4 bytes
+  // the frame is a minimum of 18 bytes long
+
+
+	min := 4
+	max := len(b) - 4
+	split := rand.Intn(max - min + 1) + min
+
+	ba := b[0:split]
+	bb := b[split:]
+
+	
+	length, werr = c.conn.Write(ba)
+	if werr != nil {
+		fmt.Printf("Write Error: %v\n", werr)
+	} else {
+		fmt.Printf("Wrote %d bytes.\n", length)
+	}
+
+	time.Sleep(2000 * time.Millisecond)
+
+	length, werr = c.conn.Write(bb)
+	if werr != nil {
+		fmt.Printf("Write Error: %v\n", werr)
+	} else {
+		fmt.Printf("Wrote %d bytes.\n", length)
+		c.timeoutCount = 0
+	}
+
+	
+}
+
+func (c *Connection) shouldFragment() bool {
+
+	//	return false 
+
+	
+	
+	max := float64(0.8)
+	val := rand.Float64()
+
+	if val >= max {
+		return true
+	}
+
+	return false 
+
+}
+
 // Handles incoming requests.
 func (c *Connection) Run() {
 	var length int
 	var rerr error
-	var werr error
+	//var werr error
 
 	//frameno := 0
 	buf := make([]byte, 1024)
@@ -90,8 +181,18 @@ func (c *Connection) Run() {
 
 		// do some writing
 		// 		f := c.CreateTestFrame()
-		f := c.CreateTestFrameWithControlChars()
+		//		f := c.CreateTestFrameWithControlChars()
+		f := c.CreateRollingFrame()
 		f.Print()
+
+
+		if(c.shouldFragment()) {
+			c.WriteFrameFragmented(f)
+		} else {
+			c.WriteFrame(f)
+		}
+
+		/*
 		b := f.NetworkBytes()
 
 		// write out the frame
@@ -102,6 +203,9 @@ func (c *Connection) Run() {
 			fmt.Printf("Wrote %d bytes.\n", length)
 			c.timeoutCount = 0
 		}
+
+
+    */
 
 		time.Sleep(10000 * time.Millisecond)
 

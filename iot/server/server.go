@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	
 	//	"strings"
 )
 
@@ -15,9 +14,10 @@ type IoTServer struct {
 }
 
 const (
-    CONN_HOST = "192.168.8.100"
-    CONN_PORT = "3000"
-    CONN_TYPE = "tcp"
+	//CONN_HOST = "192.168.0.99"
+	CONN_HOST = "192.168.8.100"
+	CONN_PORT = "3000"
+	CONN_TYPE = "tcp"
 )
 
 

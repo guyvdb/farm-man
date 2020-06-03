@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 	"bytes"
+	"errors"
 )
 
 const (
@@ -20,6 +21,16 @@ var ControlCharacters  []byte = []byte{
 	SFLAG,
 	EFLAG,
 	ESCAPE,
+}
+
+var (
+	ArgumentOverflow error = errors.New("ArgumentOverflow")
+)
+
+// You can use a FramePayload to generate the payload byte array
+// of a Frame before you create the Frame 
+type FramePayload struct {
+	buffer *bytes.Buffer 
 }
 
 
@@ -45,15 +56,41 @@ type Frame struct {
 	Cmd uint8
 	Len uint8
 	Payload []byte
+	ArgPtr uint8
 }
 
+func NewFramePayload() *FramePayload {
+	return &FramePayload{
+		buffer: &bytes.Buffer{},
+	}
+}
+
+func (payload *FramePayload)AddUint8(data uint8) {
+	payload.buffer.WriteByte(byte(data))
+}
+
+func (payload *FramePayload)AddUint16(data uint16) {
+	payload.buffer.Write(bytes_uint16_encode(data))
+}
+
+func (payload *FramePayload)AddUint32(data uint32) {
+	payload.buffer.Write(bytes_uint32_encode(data))
+}
+
+func (payload *FramePayload)Bytes() []byte {
+	return payload.buffer.Bytes()
+}
 
 // create a new frame with a payload 
 func NewFrame(payload []byte) *Frame {
 	return &Frame{
 		Version: FRAMEVERSION,
+		TCount: 1,
+		//		Transmitted: int32(time.Now().Unix()),
+		RefId: 0,
 		Len: uint8(len(payload)),
 		Payload: payload,
+		ArgPtr: 0,
 	}
 }
 
@@ -68,11 +105,6 @@ func NewFrameFromNetworkBytes(data []byte) *Frame {
 	var f Frame 
 	buf := stripControlCharacters(data)
 
-	
-	// func bytes_uint8_decode(data []byte) uint8 
-	// func bytes_uint16_decode(data []byte) uint16 
-	// func bytes_uint32_decode(data []byte) uint32 
-	
 	f.Version = bytes_uint8_decode(buf[0:])
 	f.Id = bytes_uint16_decode(buf[2:])
 	f.TCount = bytes_uint8_decode(buf[4:])
@@ -80,6 +112,7 @@ func NewFrameFromNetworkBytes(data []byte) *Frame {
 	f.RefId = bytes_uint16_decode(buf[9:])
 	f.Cmd = bytes_uint8_decode(buf[11:])
 	f.Len = bytes_uint8_decode(buf[12:])
+	f.ArgPtr = 0
 
 	if f.Len > 0 {
 		f.Payload = make([]byte, int(f.Len))
@@ -171,10 +204,7 @@ func (f *Frame) Print() {
 		fmt.Printf("%d ", b)
 	}
 	fmt.Printf("] Size=%d\n", len(buf))
-
-	
   fmt.Printf("-- END FRAME --\n\n");
-	
 }
 
 
@@ -234,4 +264,47 @@ func (f *Frame) FrameBytes() []byte {
 	}
 
 	return buf.Bytes()
+}
+
+
+
+// Check that we can still pull len bytes from the payload 
+func (f *Frame) checkArgs(len uint8) bool {
+	if f.ArgPtr + len < f.Len {
+		return true
+	} else {
+		return false
+	}
+}
+
+
+
+func (f *Frame) GetUint8Arg() (uint8, error) {
+	if f.checkArgs(1) {
+		val := bytes_uint8_decode(f.Payload[f.ArgPtr:])
+		f.ArgPtr += 1
+		return val, nil 
+	} else {
+		return 0, ArgumentOverflow
+	}
+}
+
+func (f *Frame) GetUint16Arg() (uint16, error) {
+	if f.checkArgs(2) {
+		val := bytes_uint16_decode(f.Payload[f.ArgPtr:])
+		f.ArgPtr += 2
+		return val, nil 
+	} else {
+		return 0, ArgumentOverflow
+	}
+}
+
+func (f *Frame) GetUint32Arg() (uint32, error) {
+	if f.checkArgs(1) {
+		val := bytes_uint32_decode(f.Payload[f.ArgPtr:])
+		f.ArgPtr += 4
+		return val, nil 
+	} else {
+		return 0, ArgumentOverflow
+	}
 }
