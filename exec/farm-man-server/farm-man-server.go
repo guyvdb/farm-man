@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	iot "github.com/guyvdb/farm-man/iot/server"
+	"github.com/guyvdb/farm-man/iot"
 )
 
 const (

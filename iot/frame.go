@@ -1,4 +1,4 @@
-package server
+package iot
 
 import (
 	"bytes"

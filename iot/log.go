@@ -1,4 +1,4 @@
-package server
+package iot
 
 const (
 	LOGTYPE_POWERUP            uint8 = 0
