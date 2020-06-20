@@ -1,61 +1,107 @@
 package server
 
-
 import (
 	"fmt"
+	"log"
 	"net"
-	"os"
-	//	"strings"
+	"sync"
+	"time"
 )
 
-
-
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
 type IoTServer struct {
+	counter     int64
+	ch          chan bool
+	waitGroup   *sync.WaitGroup
+	connections map[int64]*Connection
+	motes       map[uint32]int64
 }
 
-const (
-	//CONN_HOST = "192.168.0.99"
-	CONN_HOST = "192.168.8.100"
-	CONN_PORT = "3000"
-	CONN_TYPE = "tcp"
-)
-
-
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
 func NewServer() *IoTServer {
-	return &IoTServer{
+	s := &IoTServer{
+		counter:     0,
+		ch:          make(chan bool),
+		waitGroup:   &sync.WaitGroup{},
+		connections: make(map[int64]*Connection),
+		motes:       make(map[uint32]int64),
+	}
+	s.waitGroup.Add(1)
+	return s
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IoTServer) nextConnectionId() int64 {
+	s.counter++
+	return s.counter
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IoTServer) Serve(listener *net.TCPListener) {
+	defer s.waitGroup.Done()
+	for {
+		select {
+		case <-s.ch:
+			log.Println("Stopping listening on", listener.Addr())
+			listener.Close()
+			return
+		default:
+		}
+		listener.SetDeadline(time.Now().Add(1e9))
+		conn, err := listener.AcceptTCP()
+		if nil != err {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				continue
+			}
+			log.Println(err)
+		}
+		log.Println(conn.RemoteAddr(), "Connected")
+		s.waitGroup.Add(1)
+
+		c := NewConnection(s, conn, s.nextConnectionId())
+		s.connections[c.Id] = c
+		go c.Read()
+		go c.Process()
 	}
 }
 
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IoTServer) Stop() {
+	for _, conn := range s.connections {
+		conn.Stop()
+	}
 
-
-func (s *IoTServer) Run() {
-    // Listen for incoming connections.
-    l, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-    if err != nil {
-        fmt.Println("Error listening:", err.Error())
-        os.Exit(1)
-    }
-    // Close the listener when the application closes.
-    defer l.Close()
-    fmt.Println("Listening on " + CONN_HOST + ":" + CONN_PORT)
-    for {
-        // Listen for an incoming connection.
-        conn, err := l.Accept()
-        if err != nil {
-            fmt.Println("Error accepting: ", err.Error())
-            os.Exit(1)
-        }
-
-			fmt.Printf("Accepted connection\n")
-			
-			// Handle connections in a new goroutine.
-			c := NewConnection(conn)
-			go c.Run()
-			//go s.handleRequest(conn)
-    }
+	close(s.ch)
+	s.waitGroup.Done() // for the listener
+	s.waitGroup.Wait()
+	log.Println("Server shutdown complete.")
 }
 
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IoTServer) RegisterMote(connection *Connection) {
+	s.motes[connection.MoteId] = connection.Id
+	fmt.Printf("Mote: %d registered\n", connection.MoteId)
+}
 
-
-
-
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IoTServer) ConnectionComplete(connection *Connection) {
+	s.waitGroup.Done()
+	_, ok := s.connections[connection.Id]
+	if ok {
+		delete(s.connections, connection.Id)
+	}
+}
