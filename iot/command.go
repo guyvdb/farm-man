@@ -5,18 +5,15 @@ import (
 )
 
 const (
-	ACK  uint8 = 0 // can be used to respond in the affirmative to a number of commands
-	NACK       = 1 // can be used to respond in the negative to a number of commands
-	// RESERVED = 2
-	// RESERVED = 3
-	IDENTREQ    = 4
-	IDENT       = 5 // sent by client to server - no response
-	TIMEREQ     = 6 // sent by client to server - respond with timeresp
-	TIMESET     = 7 // sent by server to client - in response to timereq - client should set time
-	TIMEZONESET = 8
-	LOG         = 9
-	// RESERVED = 27
-
+	ACK         uint8 = 0
+	NACK              = 1
+	IDENTREQ          = 4
+	IDENT             = 5
+	TIMEREQ           = 6
+	TIMESET           = 7
+	TIMEZONESET       = 8
+	LOG               = 9
+	RELAYSET          = 10
 )
 
 var COMMANDS map[uint8]string = map[uint8]string{
@@ -28,6 +25,7 @@ var COMMANDS map[uint8]string = map[uint8]string{
 	TIMESET:     "TIMESET",
 	TIMEZONESET: "TIMEZONESET",
 	LOG:         "LOG",
+	RELAYSET:    "RELAYSET",
 }
 
 /* ------------------------------------------------------------------------
@@ -83,5 +81,18 @@ func CmdCreateTIMESET(refid uint16, time int64) *Frame {
 	frame := NewFrame(args.Bytes())
 	frame.Cmd = TIMESET
 	frame.RefId = refid
+	return frame
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func CmdRELAYSET(pin uint8, value uint8) *Frame {
+	args := NewFramePayload()
+	args.AddUint8(pin)
+	args.AddUint8(value)
+
+	frame := NewFrame(args.Bytes())
+	frame.Cmd = RELAYSET
 	return frame
 }

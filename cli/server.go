@@ -3,22 +3,28 @@ package cli
 // this server listens for commands from the cli client and transmits them to the appropriate mote
 
 import (
+	"log"
 	"net"
 	"sync"
+	"time"
+
+	"github.com/guyvdb/farm-man/iot"
 )
 
 type Server struct {
 	ch        chan bool
 	waitGroup *sync.WaitGroup
+	control   iot.ControlPanel
 }
 
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func NewServer() *Server {
+func NewServer(control iot.ControlPanel) *Server {
 	return &Server{
 		ch:        make(chan bool),
 		waitGroup: &sync.WaitGroup{},
+		control:   control,
 	}
 }
 
@@ -26,7 +32,7 @@ func NewServer() *Server {
  *
  * --------------------------------------------------------------------- */
 func (s *Server) Serve(listener *net.TCPListener) {
-	defer s.waitGroup.Done()
+	//defer s.waitGroup.Done()
 	for {
 		select {
 		case <-s.ch:
@@ -43,10 +49,12 @@ func (s *Server) Serve(listener *net.TCPListener) {
 			}
 			log.Println(err)
 		}
-		log.Println(conn.RemoteAddr(), "Connected")
+		log.Printf("[CLI] %s Connected.\n", conn.RemoteAddr())
 		s.waitGroup.Add(1)
 
 		// need to process new conn here
+		c := NewConnection(conn, s.control)
+		go c.Run()
 
 	}
 }
@@ -56,7 +64,7 @@ func (s *Server) Serve(listener *net.TCPListener) {
  * --------------------------------------------------------------------- */
 func (s *Server) Stop() {
 	close(s.ch)
-	s.waitGroup.Done() // for the listener
+	//s.waitGroup.Done() // for the listener
 	s.waitGroup.Wait()
 	log.Println("[CLI] Server shutdown complete.")
 }

@@ -17,10 +17,10 @@ var idleTimeoutDuration time.Duration = 60 * time.Second
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-type Connection struct {
+type IOTConnection struct {
 	Id                  int64
 	MoteId              uint32
-	server              *IoTServer
+	server              Server
 	counter             uint16
 	conn                net.Conn
 	timeoutCount        int
@@ -33,8 +33,8 @@ type Connection struct {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func NewConnection(server *IoTServer, conn net.Conn, connid int64) *Connection {
-	return &Connection{
+func NewConnection(server Server, conn net.Conn, connid int64) Connection {
+	return &IOTConnection{
 		Id:           connid,
 		server:       server,
 		MoteId:       0,
@@ -50,7 +50,21 @@ func NewConnection(server *IoTServer, conn net.Conn, connid int64) *Connection {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (c *Connection) nextId() uint16 {
+func (c *IOTConnection) GetId() int64 {
+	return c.Id
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (c *IOTConnection) GetMoteId() uint32 {
+	return c.MoteId
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (c *IOTConnection) nextId() uint16 {
 	c.counter++
 	if c.counter == 0 {
 		c.counter = 1
@@ -61,7 +75,7 @@ func (c *Connection) nextId() uint16 {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (c *Connection) Write(frame *Frame) {
+func (c *IOTConnection) Write(frame *Frame) {
 	var werr error
 	frame.Id = c.nextId()
 
@@ -69,10 +83,10 @@ func (c *Connection) Write(frame *Frame) {
 
 	_, werr = c.conn.Write(b)
 	if werr != nil {
-		log.Printf("[%d:%d] Write Error: %v\n", c.Id, c.MoteId, werr)
+		log.Printf("[IOT] [%d:%d] Write Error: %v\n", c.Id, c.MoteId, werr)
 	} else {
 		if c.debug {
-			log.Printf("[%d:%d] TX %s\n", c.Id, c.MoteId, frame)
+			log.Printf("[IOT] [%d:%d] TX %s\n", c.Id, c.MoteId, frame)
 		}
 		c.timeoutCount = 0
 	}
@@ -81,7 +95,7 @@ func (c *Connection) Write(frame *Frame) {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (c *Connection) Read() {
+func (c *IOTConnection) Read() {
 	var length int
 	var rerr error
 
@@ -112,20 +126,20 @@ func (c *Connection) Read() {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (c *Connection) Process() {
+func (c *IOTConnection) Process() {
 	var err error
 	defer c.conn.Close()
 
 	for {
 		f := <-c.frames
 		if c.debug {
-			log.Printf("[%d:%d] RX %s\n", c.Id, c.MoteId, f)
+			log.Printf("[IOT] [%d:%d] RX %s\n", c.Id, c.MoteId, f)
 		}
 		switch f.Cmd {
 		case IDENT:
 			c.MoteId, err = CmdDecodeIDENT(f)
 			if err != nil {
-				log.Printf("[%d:%d] [ERROR] decoding mote id from IDENT. %v\n", c.Id, c.MoteId, err)
+				log.Printf("[IOT] [%d:%d] [ERROR] decoding mote id from IDENT. %v\n", c.Id, c.MoteId, err)
 			} else {
 				c.server.RegisterMote(c)
 				c.Write(CmdCreateACK(f.Id))
@@ -148,6 +162,13 @@ func (c *Connection) Process() {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (c *Connection) Stop() {
+func (c *IOTConnection) Stop() {
 	c.running = false
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (c *IOTConnection) SetRelay(pin uint8, value uint8) {
+	c.Write(CmdRELAYSET(pin, value))
 }

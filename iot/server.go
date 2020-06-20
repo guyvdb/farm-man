@@ -1,7 +1,7 @@
 package iot
 
 import (
-	"fmt"
+	//	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -11,23 +11,23 @@ import (
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-type IoTServer struct {
+type IOTServer struct {
 	counter     int64
 	ch          chan bool
 	waitGroup   *sync.WaitGroup
-	connections map[int64]*Connection
+	connections map[int64]Connection
 	motes       map[uint32]int64
 }
 
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func NewServer() *IoTServer {
-	s := &IoTServer{
+func NewServer() Server {
+	s := &IOTServer{
 		counter:     0,
 		ch:          make(chan bool),
 		waitGroup:   &sync.WaitGroup{},
-		connections: make(map[int64]*Connection),
+		connections: make(map[int64]Connection),
 		motes:       make(map[uint32]int64),
 	}
 	s.waitGroup.Add(1)
@@ -37,7 +37,7 @@ func NewServer() *IoTServer {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (s *IoTServer) nextConnectionId() int64 {
+func (s *IOTServer) nextConnectionId() int64 {
 	s.counter++
 	return s.counter
 }
@@ -45,12 +45,12 @@ func (s *IoTServer) nextConnectionId() int64 {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (s *IoTServer) Serve(listener *net.TCPListener) {
+func (s *IOTServer) Serve(listener *net.TCPListener) {
 	defer s.waitGroup.Done()
 	for {
 		select {
 		case <-s.ch:
-			log.Println("Stopping listening on", listener.Addr())
+			log.Println("[IOT] Stopping listening on", listener.Addr())
 			listener.Close()
 			return
 		default:
@@ -63,11 +63,12 @@ func (s *IoTServer) Serve(listener *net.TCPListener) {
 			}
 			log.Println(err)
 		}
-		log.Println(conn.RemoteAddr(), "Connected")
+		//		log.Println(conn.RemoteAddr(), "Connected")
+		log.Printf("[IOT] %s Connected.\n", conn.RemoteAddr())
 		s.waitGroup.Add(1)
 
 		c := NewConnection(s, conn, s.nextConnectionId())
-		s.connections[c.Id] = c
+		s.connections[c.GetId()] = c
 		go c.Read()
 		go c.Process()
 	}
@@ -76,7 +77,7 @@ func (s *IoTServer) Serve(listener *net.TCPListener) {
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (s *IoTServer) Stop() {
+func (s *IOTServer) Stop() {
 	for _, conn := range s.connections {
 		conn.Stop()
 	}
@@ -84,24 +85,50 @@ func (s *IoTServer) Stop() {
 	close(s.ch)
 	s.waitGroup.Done() // for the listener
 	s.waitGroup.Wait()
-	log.Println("Server shutdown complete.")
+	log.Println("[IOT] Server shutdown complete.")
 }
 
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (s *IoTServer) RegisterMote(connection *Connection) {
-	s.motes[connection.MoteId] = connection.Id
-	fmt.Printf("Mote: %d registered\n", connection.MoteId)
+func (s *IOTServer) RegisterMote(connection Connection) {
+	s.motes[connection.GetMoteId()] = connection.GetId()
+	log.Printf("[IOT] Mote %d registered\n", connection.GetMoteId())
 }
 
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
-func (s *IoTServer) ConnectionComplete(connection *Connection) {
+func (s *IOTServer) ConnectionComplete(connection Connection) {
 	s.waitGroup.Done()
-	_, ok := s.connections[connection.Id]
+	_, ok := s.connections[connection.GetId()]
 	if ok {
-		delete(s.connections, connection.Id)
+		delete(s.connections, connection.GetId())
 	}
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IOTServer) MoteConnected(moteid uint32) bool {
+	_, ok := s.motes[moteid]
+	return ok
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (s *IOTServer) SetRelay(moteid uint32, pin uint8, value uint8) bool {
+	mid, ok := s.motes[moteid]
+	if !ok {
+		return false
+	}
+
+	conn, cok := s.connections[mid]
+	if !cok {
+		return false
+	}
+
+	conn.SetRelay(pin, value)
+	return true
 }
