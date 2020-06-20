@@ -30,7 +30,7 @@ func (s *Server) Serve(listener *net.TCPListener) {
 	for {
 		select {
 		case <-s.ch:
-			log.Println("Stopping listening on", listener.Addr())
+			log.Println("[CLI] Stopping listening on", listener.Addr())
 			listener.Close()
 			return
 		default:
@@ -58,5 +58,5 @@ func (s *Server) Stop() {
 	close(s.ch)
 	s.waitGroup.Done() // for the listener
 	s.waitGroup.Wait()
-	log.Println("Server shutdown complete.")
+	log.Println("[CLI] Server shutdown complete.")
 }
