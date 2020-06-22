@@ -5,6 +5,9 @@ import (
 	"github.com/guyvdb/farm-man/cli"
 	"github.com/guyvdb/farm-man/config"
 	"github.com/guyvdb/farm-man/iot"
+	//"github.com/guyvdb/farm-man/platform/adapter"
+	"github.com/guyvdb/farm-man/platform/adapter/mongo"
+	"github.com/guyvdb/farm-man/platform/model/infrastructure"
 	"log"
 	"math/rand"
 	"net"
@@ -31,7 +34,6 @@ func startIotServer(address string) iot.Server {
 
 	moteServer := iot.NewServer()
 	go moteServer.Serve(listener)
-
 	return moteServer
 }
 
@@ -56,6 +58,10 @@ func startCliServer(address string, control iot.ControlPanel) *cli.Server {
 	return cliServer
 }
 
+// func createMongoAdapter(uri string, database string) (adapter.Adapter, error) {
+// 	return mongo.NewMongoAdapter(uri, database)
+// }
+
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
@@ -67,6 +73,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	adapter, err := mongo.NewMongoAdapter(cfg.DatabaseURI, cfg.DatabaseName)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("adapter: %v\n", adapter)
+	fmt.Printf("infrastructure repo: %v", adapter.GetInfrastructureRepository())
+
+	seq := adapter.GetSequenceRepository()
+
+	p := infrastructure.NewBounds(seq.Next("FARM", ""), infrastructure.BOUNDSTYPE_FARM, "farm", nil)
+	c := infrastructure.NewBounds(seq.Next("TUNNEL", "-"), infrastructure.BOUNDSTYPE_AREA, "field 1", p)
+
+	fmt.Printf("=============================>\n")
+	fmt.Printf("Parent: %s\n", p.Id)
+	fmt.Printf("Child: %s, Parent: %s\n", c.Id, c.ParentId)
+
+	fmt.Printf("============================>\n")
+	fmt.Printf("Next Sequence: %s\n", seq.Next("BUCKET", "-"))
+
+	// ==============
+	return
 
 	// prime the random number generator
 	rand.Seed(time.Now().UnixNano())

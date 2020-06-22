@@ -5,8 +5,10 @@ import (
 )
 
 type Config struct {
-	IOTAddress string
-	CLIAddress string
+	IOTAddress   string
+	CLIAddress   string
+	DatabaseURI  string
+	DatabaseName string
 }
 
 func NewConfig(filename string) (*Config, error) {
@@ -16,16 +18,20 @@ func NewConfig(filename string) (*Config, error) {
 	}
 
 	c := &Config{
-		IOTAddress: v.GetString("iot-address"),
-		CLIAddress: v.GetString("cli-address"),
+		IOTAddress:   v.GetString("iot-address"),
+		CLIAddress:   v.GetString("cli-address"),
+		DatabaseURI:  v.GetString("database-uri"),
+		DatabaseName: v.GetString("database-name"),
 	}
 	return c, nil
 }
 
 func defaults() map[string]interface{} {
 	return map[string]interface{}{
-		"iot-address": "192.168.8.100:6000",
-		"cli-address": "192.168.8.100:6001",
+		"iot-address":   "192.168.8.100:6000",
+		"cli-address":   "192.168.8.100:6001",
+		"database-uri":  "mongodb://localhost:27017",
+		"database-name": "farm-man",
 	}
 }
 
