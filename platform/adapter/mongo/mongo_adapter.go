@@ -37,11 +37,14 @@ func mongoConnect(uri string) (*mongo.Client, error) {
 	return client, nil
 }
 
+func (a *MongoAdapter) getdb() *mongo.Database {
+	return a.client.Database(a.database)
+}
+
 func (a *MongoAdapter) GetInfrastructureRepository() repository.InfrastructureRepository {
-	return NewMongoInfrastructureRepository()
+	return NewMongoInfrastructureRepository(a.getdb())
 }
 
 func (a *MongoAdapter) GetSequenceRepository() repository.SequenceRepository {
-	db := a.client.Database(a.database)
-	return NewMongoSequenceRepository(db)
+	return NewMongoSequenceRepository(a.getdb())
 }

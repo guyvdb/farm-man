@@ -7,6 +7,7 @@ import (
 	"github.com/guyvdb/farm-man/iot"
 	//"github.com/guyvdb/farm-man/platform/adapter"
 	"github.com/guyvdb/farm-man/platform/adapter/mongo"
+	"github.com/guyvdb/farm-man/platform/domain"
 	"github.com/guyvdb/farm-man/platform/model/infrastructure"
 	"log"
 	"math/rand"
@@ -58,10 +59,6 @@ func startCliServer(address string, control iot.ControlPanel) *cli.Server {
 	return cliServer
 }
 
-// func createMongoAdapter(uri string, database string) (adapter.Adapter, error) {
-// 	return mongo.NewMongoAdapter(uri, database)
-// }
-
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
@@ -79,20 +76,22 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("adapter: %v\n", adapter)
-	fmt.Printf("infrastructure repo: %v", adapter.GetInfrastructureRepository())
+	service := domain.NewDomainService(adapter)
 
-	seq := adapter.GetSequenceRepository()
+	fmt.Printf("service: %v\n", service)
 
-	p := infrastructure.NewBounds(seq.Next("FARM", ""), infrastructure.BOUNDSTYPE_FARM, "farm", nil)
-	c := infrastructure.NewBounds(seq.Next("TUNNEL", "-"), infrastructure.BOUNDSTYPE_AREA, "field 1", p)
+	// func (s *Service) CreateBounds(btype infrastructure.BoundsType, name string, parent *infrastructure.Bounds) (*infrastructure.Bounds, error) {
+	farm, err := service.CreateBounds(infrastructure.BOUNDSTYPE_FARM, "Farm", nil)
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Printf("=============================>\n")
-	fmt.Printf("Parent: %s\n", p.Id)
-	fmt.Printf("Child: %s, Parent: %s\n", c.Id, c.ParentId)
+	t1, err := service.CreateBounds(infrastructure.BOUNDSTYPE_GREENHOUSE, "Tunnel 1", farm)
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Printf("============================>\n")
-	fmt.Printf("Next Sequence: %s\n", seq.Next("BUCKET", "-"))
+	fmt.Printf("Create: farm = %v, tunnel = %v\n", farm, t1)
 
 	// ==============
 	return

@@ -18,14 +18,20 @@ type MongoSequenceRepository struct {
 	database *mongo.Database
 }
 
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
 func NewMongoSequenceRepository(database *mongo.Database) repository.SequenceRepository {
 	return &MongoSequenceRepository{
 		database: database,
 	}
 }
 
-func padnum(seq int32, padlen int32) string {
-	// convert seq to a string and pad it to 7 digits long
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func padnum(seq int, padlen int) string {
+	// convert seq to a string and pad it to padlen digits long
 	v := fmt.Sprintf("%d", seq)
 	len := int(padlen) - len(v)
 
@@ -35,14 +41,53 @@ func padnum(seq int32, padlen int32) string {
 	return v
 }
 
-// The sequence collection has the following properties:
-// seq{_id:"PREFIX",pad: xxx, seq:xxx}
-// Because of upsert, an error can occure. Outcomes could be:
-//  - Exactly one findAndModify() would successfully insert a new document.
-// 	- Zero or more findAndModify() methods would update the newly inserted document.
-// 	- Zero or more findAndModify() methods would fail when they attempted to insert a duplicate.
-// If the method fails due to a unique index constraint violation, retry the method. Absent a
-// delete of the document, the retry should not fail.
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (r *MongoSequenceRepository) CreateSequence(prefix string, padding int) error {
+	var val int = 1
+
+	seq := bson.D{
+		"_id": prefix,
+		"pad": padding,
+		"seq": val,
+	}
+
+	_, err := r.database.Collection("sequence").InsertOne(context.Background(), seq)
+	return err
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (r *MongoSequenceRepository) DeleteSequence(prefix string) error {
+
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (r *MongoSequenceRepository) ResetSequence(prefix string) error {
+
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func (r *MongoSequenceRepository) DeleteAllSequences() error {
+
+}
+
+/* ------------------------------------------------------------------------
+ * The sequence collection has the following properties:
+ * seq{_id:"PREFIX",pad: xxx, seq:xxx}
+ * Because of upsert, an error can occure. Outcomes could be:
+ *  - Exactly one findAndModify() would successfully insert a new document.
+ * 	- Zero or more findAndModify() methods would update the newly inserted document.
+ * 	- Zero or more findAndModify() methods would fail when they attempted to insert a duplicate.
+ * If the method fails due to a unique index constraint violation, retry the method. Absent a
+ * delete of the document, the retry should not fail.
+ * --------------------------------------------------------------------- */
 func (r *MongoSequenceRepository) Next(prefix string, seperator string) sequence.Sequence {
 	var result bson.M
 	var padlen int32

@@ -5,5 +5,9 @@ import (
 )
 
 type SequenceRepository interface {
+	CreateSequence(prefix string, padding int) error
+	DeleteSequence(prefix string) error
+	ResetSequence(prefix string) error
+	DeleteAllSequences() error
 	Next(prefix string, seperator string) sequence.Sequence
 }

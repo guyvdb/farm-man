@@ -19,15 +19,34 @@ const (
 	//BOUNDSTYPE_BUCKET
 )
 
+var boundsPrefixes map[BoundsType]string = map[BoundsType]string{
+	BOUNDSTYPE_FARM:       "FARM",
+	BOUNDSTYPE_AREA:       "AREA",
+	BOUNDSTYPE_GREENHOUSE: "GREENHOUSE",
+	BOUNDSTYPE_ROW:        "ROW",
+	BOUNDSTYPE_BIN:        "BIN",
+}
+
+/* ------------------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------- */
+func BoundsTypePrefix(btype BoundsType) string {
+	p, ok := boundsPrefixes[btype]
+	if ok {
+		return p
+	}
+	return "BOUNDS_TYPE_ERROR"
+}
+
 /* ------------------------------------------------------------------------
  *
  * --------------------------------------------------------------------- */
 type Bounds struct {
 	Id       sequence.Sequence `bson:"_id" json:"id,omitempty"`
-	Type     BoundsType        `bson:"typeid",json:"typeid"`
-	ParentId sequence.Sequence `bson:"parentid", json:"parentid"`
+	Type     BoundsType        `bson:"tid",json:"tid"`
+	ParentId sequence.Sequence `bson:"pid,omitempty", json:"pid"`
 	Name     string            `bson:"name",json:"name"`
-	Children []*Bounds
+	Children []*Bounds         `bson:"-"`
 }
 
 /* ------------------------------------------------------------------------
